@@ -28,14 +28,17 @@ typedef enum {
 // Estrutura que define um Task Control Block (TCB)
 typedef struct task_t
 {
-	struct task_t *prev, *next ;	// ponteiros para usar em filas
-	int id ;						// identificador da tarefa
-	ucontext_t context ;			// contexto armazenado da tarefa
-	Status status;				// current status
-	char static_prio;			// static priority
-	char prio;					// current priority
-	char is_system_task;
-	short quantum_size;
+	struct task_t *prev, *next ;	// pointers for queue
+	int id ;						// task id
+	ucontext_t context ;			// task context
+	Status status;					// current status
+	char static_prio;				// static priority
+	char prio;						// current priority
+	char is_system_task;			// system task indicator
+	unsigned int quantum_size;		// tasks quantum
+	unsigned int init_time;			// time of creation
+	unsigned int tick_count;		// time spent in the CPU
+	unsigned int activation_count;	// times activated
 	// ... (outros campos serão adicionados mais tarde)
 } task_t ;
 

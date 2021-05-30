@@ -7,6 +7,7 @@
 #include "ppos.h"
 #include "ppos_data.h"
 
+unsigned int sys_ticks;
 int id; 			 // id tracker to guarantee unique task IDs
 int taskCount;
 task_t contextMain;  // main() task descriptor
@@ -21,6 +22,7 @@ struct itimerval timer ;
 void dispatcher();
 task_t *scheduler();
 void alarm_handler(int signum);
+unsigned int systime();
 
 void ppos_init() {
 	#ifdef DEBUG
@@ -39,11 +41,12 @@ void ppos_init() {
 	}
 
 	/* Timer setup */
+	sys_ticks = 0; // set tick counter
 	// ajusta valores do temporizador
-	timer.it_value.tv_usec = 1000;      // primeiro disparo, em micro-segundos
-	timer.it_value.tv_sec  = 0;      // primeiro disparo, em segundos
-	timer.it_interval.tv_usec = 1000;   // disparos subsequentes, em micro-segundos
-	timer.it_interval.tv_sec  = 0;   // disparos subsequentes, em segundos
+	timer.it_value.tv_usec = 1000;    // primeiro disparo, em micro-segundos
+	timer.it_value.tv_sec  = 0;       // primeiro disparo, em segundos
+	timer.it_interval.tv_usec = 1000; // disparos subsequentes, em micro-segundos
+	timer.it_interval.tv_sec  = 0;    // disparos subsequentes, em segundos
 
 	// arma o temporizador ITIMER_REAL (vide man setitimer)
 	if (setitimer (ITIMER_REAL, &timer, 0) < 0) {
@@ -58,6 +61,10 @@ void ppos_init() {
 
 	task_create(&dispatcherTask, dispatcher, NULL);
 
+}
+
+unsigned int systime() {
+	return sys_ticks;
 }
 
 task_t *scheduler() {
@@ -93,6 +100,8 @@ task_t *scheduler() {
 }
 
 void alarm_handler(int signum) {
+	sys_ticks++;
+	currentTask->tick_count++;
 
 	if(currentTask->is_system_task)
 		return;
@@ -127,7 +136,7 @@ void dispatcher() {
 
 			queue_remove((queue_t **)&rdyQ, (queue_t *)next);
 			next->status = RUNNING;
-			next->quantum_size = QUANTUM_SIZE;
+			next->quantum_size = QUANTUM_SIZE-1; // interval of size QUANTUM_SIZE is [0..QUANTUM_SIZE-1]
 
 			task_switch(next);
 
@@ -152,12 +161,13 @@ void dispatcher() {
 					break;
 			}
 		} 
+
 	}
 
 	#ifdef DEBUG
 	printf("DISPATCHER: switching to task %02d\n", next->id);
 	#endif
-	task_switch(&contextMain);
+	task_exit(0);
 }
 
 void task_setprio(task_t *task, int prio) {
@@ -211,6 +221,9 @@ int task_create(task_t *task, void (*start_routine)(void *),  void *arg) {
 		task->id = ++id;
 		task->prio = 0;
 		task->static_prio = 0;
+		task->init_time = systime();
+		task->tick_count = 0;
+		task->activation_count = 0;
 
 		makecontext(&task->context, (void *)start_routine, 1, arg);
 
@@ -227,6 +240,7 @@ int task_create(task_t *task, void (*start_routine)(void *),  void *arg) {
 			task->status = RUNNING;
 			task->is_system_task = TRUE;
 		}
+
 
 		return task->id;
 	}
@@ -245,6 +259,8 @@ int task_switch(task_t *task) {
 	#ifdef DEBUG
 	printf("SWITCH: swapping context : %02d to %02d\n", aux->id, task->id);
 	#endif
+
+	task->activation_count++;
 	if(swapcontext(&aux->context, &task->context) >= 0) {
 		return 0;
 	}
@@ -254,9 +270,12 @@ int task_switch(task_t *task) {
 }
 
 void task_exit(int exitCode) {
-	#ifdef DEBUG
-	printf("EXIT: Exiting task %02d\n", currentTask->id);
-	#endif
+	// #ifdef DEBUG
+	// printf("EXIT: Exiting task %02d\n", currentTask->id);
+	// #endif
+
+	printf("Task %d exit: execution time %5u ms, processor time %4u ms, %3u activations\n", 
+	currentTask->id, systime() - currentTask->init_time, currentTask->tick_count, currentTask->activation_count);
 
 	if(currentTask != &dispatcherTask) {
 		taskCount--;
