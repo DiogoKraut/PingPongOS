@@ -13,6 +13,9 @@
 #include "queue.h"		    // biblioteca de filas genéricas
 
 #define STACKSIZE 64*1024	/* tamanho de pilha das threads */
+#define QUANTUM_SIZE 20		// default quantum size in ticks
+#define TRUE 1
+#define FALSE 0
 
 typedef enum {
 	READY,   // rdy to run
@@ -31,6 +34,8 @@ typedef struct task_t
 	Status status;				// current status
 	char static_prio;			// static priority
 	char prio;					// current priority
+	char is_system_task;
+	short quantum_size;
 	// ... (outros campos serão adicionados mais tarde)
 } task_t ;
 

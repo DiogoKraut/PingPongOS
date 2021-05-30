@@ -2,6 +2,8 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <signal.h>
+#include <sys/time.h>
 #include "ppos.h"
 #include "ppos_data.h"
 
@@ -12,8 +14,13 @@ task_t *currentTask;
 task_t *rdyQ;
 task_t dispatcherTask;
 
+// structures to assist with preemtion handling
+struct sigaction action ;
+struct itimerval timer ;
+
 void dispatcher();
 task_t *scheduler();
+void alarm_handler(int signum);
 
 void ppos_init() {
 	#ifdef DEBUG
@@ -21,6 +28,28 @@ void ppos_init() {
 	#endif
 	/* desativa o buffer da saida padrao (stdout), usado pela função printf */
 	setvbuf (stdout, 0, _IONBF, 0);
+
+	/* Alarm signal setup */
+	action.sa_handler = alarm_handler;
+	sigemptyset (&action.sa_mask);
+	action.sa_flags = 0;
+	if (sigaction (SIGALRM, &action, 0) < 0) {
+		perror ("SIGACTION ERR: ");
+		exit (1);
+	}
+
+	/* Timer setup */
+	// ajusta valores do temporizador
+	timer.it_value.tv_usec = 1000;      // primeiro disparo, em micro-segundos
+	timer.it_value.tv_sec  = 0;      // primeiro disparo, em segundos
+	timer.it_interval.tv_usec = 1000;   // disparos subsequentes, em micro-segundos
+	timer.it_interval.tv_sec  = 0;   // disparos subsequentes, em segundos
+
+	// arma o temporizador ITIMER_REAL (vide man setitimer)
+	if (setitimer (ITIMER_REAL, &timer, 0) < 0) {
+		perror ("SETITIMER ERR: ");
+		exit (1);
+	}
 
 	id = 0;
 	taskCount = 0;
@@ -38,13 +67,13 @@ task_t *scheduler() {
 	task_t *aux = rdyQ->next;
 	task_t *highestPrio = rdyQ;
 	#ifdef DEBUG
-	printf("SCHED: %02d\n", rdyQ->prio);
+	// printf("SCHED: %02d\n", rdyQ->prio);
 	#endif
 	while(aux != rdyQ) {
 		#ifdef DEBUG
-		printf("SCHED: %02d\n", aux->prio);
+		// printf("SCHED: %02d\n", aux->prio);
 		#endif
-		if(aux->prio <= highestPrio->prio) // smaller prio value == higher priority
+		if(aux->prio < highestPrio->prio) // smaller prio value == higher priority
 			highestPrio = aux;
 
 		aux = aux->next;
@@ -61,6 +90,21 @@ task_t *scheduler() {
 	// printf("SCHED: Selected task %02d with prio %02d\n", highestPrio->id, highestPrio->prio);
 	// #endif
 	return highestPrio;
+}
+
+void alarm_handler(int signum) {
+
+	if(currentTask->is_system_task)
+		return;
+
+	if(currentTask->quantum_size == 0) {
+		#ifdef DEBUG
+		printf("ALARM: task %02d yielded\n", currentTask->id);
+		#endif
+		task_yield();
+	} else {
+		currentTask->quantum_size--;
+	}
 }
 
 void dispatcher() {
@@ -83,6 +127,7 @@ void dispatcher() {
 
 			queue_remove((queue_t **)&rdyQ, (queue_t *)next);
 			next->status = RUNNING;
+			next->quantum_size = QUANTUM_SIZE;
 
 			task_switch(next);
 
@@ -176,9 +221,12 @@ int task_create(task_t *task, void (*start_routine)(void *),  void *arg) {
 		if(task != &dispatcherTask) { // dispatcher cant go on ready Q
 			taskCount++;
 			task->status = READY;
+			task->is_system_task = FALSE;
 			queue_append((queue_t **)&rdyQ, (queue_t *)task);
-		} else
+		} else {
 			task->status = RUNNING;
+			task->is_system_task = TRUE;
+		}
 
 		return task->id;
 	}

@@ -10,8 +10,8 @@ TEST = $(notdir $(patsubst %.c, %, $(wildcard test/*.c)))
 PPOS = $(wildcard *.c)
 
 .PHONY: clean purge debug default
-
 default: $(TEST)
+# .precious: $(TEST) default
 	
 debug: CFLAGS += -DDEBUG -g
 debug: $(TEST)
