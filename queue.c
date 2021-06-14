@@ -7,8 +7,8 @@ int queue_size(queue_t *queue) {
 	if(queue == NULL) // EDGE CASE: empty
 		return 0;
 
-	if(queue->next == NULL) // EDGE CASE: lone element (not a queue, cant have size)
-		return 0;
+	if(queue->next == NULL)
+		return 1;
 
 	queue_t *aux = queue;
 	int count = 1;
@@ -53,14 +53,6 @@ int queue_append(queue_t **queue, queue_t *elem) {
 		return 0;
 	}
 
-	if(queue_size(*queue) == 1) { // EDGE CASE: size 1
-		(*queue)->next = elem;
-		(*queue)->prev = elem;
-		elem->next = *queue;
-		elem->prev = *queue;
-		return 0;
-	}
-
 	(*queue)->prev->next = elem;
 	elem->prev = (*queue)->prev;
 	elem->next = *queue;
@@ -70,8 +62,8 @@ int queue_append(queue_t **queue, queue_t *elem) {
 }
 
 int queue_remove(queue_t **queue, queue_t *elem) {
-	if(queue == NULL) {
-		fprintf(stderr, "Queue doesn't exist\n");
+	if(queue_size(*queue) == 0) {
+		fprintf(stderr, "Queue is empty\n");
 		return -1;
 	}
 
@@ -80,14 +72,10 @@ int queue_remove(queue_t **queue, queue_t *elem) {
 		return -3;
 	}
 
-	if(!queue_size(*queue)) {
-		fprintf(stderr, "Queue must not be empty\n");
-		return -4;
-	}
-
 	if(queue_size(*queue) == 1) { // EDGE CASE: size 1
 		if(*queue == elem) {
 			*queue = NULL;
+			queue = NULL;
 			elem->next = NULL;
 			elem->prev = NULL;
 			return 0;
