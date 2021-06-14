@@ -21,7 +21,7 @@ typedef enum {
 	READY,   // rdy to run
 	RUNNING, // currently running
 	STOPPED, // reached end of execution
-	SLEEP,   // waiting for IO
+	SUSPENDED,   // waiting for to join
 	IDLE     // interruptable sleep
 } Status;
 
@@ -39,6 +39,8 @@ typedef struct task_t
 	unsigned int init_time;			// time of creation
 	unsigned int tick_count;		// time spent in the CPU
 	unsigned int activation_count;	// times activated
+	struct task_t *waitQ;			// queue of tasks waiting to join
+	int exitCode;
 	// ... (outros campos serão adicionados mais tarde)
 } task_t ;
 

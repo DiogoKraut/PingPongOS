@@ -25,11 +25,30 @@ void alarm_handler(int signum);
 unsigned int systime();
 
 void ppos_init() {
-    #ifdef DEBUG
-    printf("INIT: PPOS intialized\n");
-    #endif
     /* desativa o buffer da saida padrao (stdout), usado pela função printf */
     setvbuf (stdout, 0, _IONBF, 0);
+
+
+    id = 0;
+    taskCount = 0;
+
+    mainTask.prev = NULL;
+    mainTask.next = NULL;
+    mainTask.id = id;
+    getcontext(&(mainTask.context));
+    mainTask.status = READY;
+    mainTask.static_prio = 0;
+    mainTask.prio = 0;
+    mainTask.is_system_task = FALSE;
+    mainTask.init_time = systime();
+    mainTask.tick_count = 0;
+    mainTask.activation_count = 0;
+    taskCount++;
+    queue_append((queue_t **)&rdyQ, (queue_t *)&mainTask);
+
+    currentTask = &mainTask; // main is initial task
+
+    task_create(&dispatcherTask, dispatcher, NULL);
 
     /* Alarm signal setup */
     action.sa_handler = alarm_handler;
@@ -39,17 +58,6 @@ void ppos_init() {
         perror ("SIGACTION ERR: ");
         exit (1);
     }
-
-    id = 0;
-    taskCount = 0;
-
-    task_create(&mainTask, NULL, NULL);
-
-    // mainTask.id = id; // set main id to 0
-    currentTask = &mainTask; // main is initial task
-
-    task_create(&dispatcherTask, dispatcher, NULL);
-
 
     /* Timer setup */
     sys_ticks = 0; // set tick counter
@@ -65,6 +73,9 @@ void ppos_init() {
         exit (1);
     }
 
+    #ifdef DEBUG
+    printf("INIT: PPOS intialized\n");
+    #endif
     task_switch(&dispatcherTask);
 
 
@@ -80,13 +91,7 @@ task_t *scheduler() {
 
     task_t *aux = rdyQ->next;
     task_t *highestPrio = rdyQ;
-    #ifdef DEBUG
-    // printf("SCHED: %02d\n", rdyQ->prio);
-    #endif
     while(aux != rdyQ) {
-        #ifdef DEBUG
-        // printf("SCHED: %02d\n", aux->prio);
-        #endif
         if(aux->prio < highestPrio->prio) // smaller prio value == higher priority
             highestPrio = aux;
 
@@ -160,8 +165,7 @@ void dispatcher() {
                     free(next->context.uc_stack.ss_sp);
                     break;
 
-                case SLEEP:
-                    /* add to sleep Q */
+                case SUSPENDED:
                     break;
                 case IDLE:
                     /* add to idle Q */
@@ -225,7 +229,7 @@ int task_create(task_t *task, void (*start_routine)(void *),  void *arg) {
 
         task->prev = NULL;
         task->next = NULL;
-        task->id = id++;
+        task->id = ++id;
         task->prio = 0;
         task->static_prio = 0;
         task->init_time = systime();
@@ -284,9 +288,23 @@ void task_exit(int exitCode) {
     printf("Task %d exit: execution time %5u ms, processor time %4u ms, %3u activations\n", 
     currentTask->id, systime() - currentTask->init_time, currentTask->tick_count, currentTask->activation_count);
 
+
+
     if(currentTask != &dispatcherTask) {
-        taskCount--;
+        currentTask->exitCode = exitCode;
         currentTask->status = STOPPED;
+
+        task_t *aux;
+        while(queue_size((queue_t *)currentTask->waitQ) > 0) {
+            printf("%d\n", (queue_size((queue_t *)currentTask->waitQ)));
+            aux = currentTask->waitQ;
+            // printf("%d\n", aux->id);
+            queue_remove((queue_t **)&currentTask->waitQ, (queue_t *)currentTask->waitQ);
+            // printf("%d\n", aux->id);
+
+            queue_append((queue_t **)&rdyQ, (queue_t *)aux);
+        }
+        taskCount--;
         task_switch(&dispatcherTask);
     } else {
         free(currentTask->context.uc_stack.ss_sp);
@@ -297,4 +315,15 @@ void task_exit(int exitCode) {
 
 int task_id() {
     return currentTask->id;
+}
+
+int task_join (task_t *task) {
+    if(task == NULL || task->status == STOPPED)
+        return task->exitCode;
+
+    queue_append((queue_t **)&task->waitQ, (queue_t *)currentTask);
+    currentTask->status = SUSPENDED;
+
+    task_switch(&dispatcherTask);
+    return task->exitCode;
 }

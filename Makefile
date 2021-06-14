@@ -9,7 +9,7 @@ HEADERS = $(wildcard header/*.h)
 TEST = $(notdir $(patsubst %.c, %, $(wildcard test/*.c)))
 PPOS = $(wildcard *.c)
 
-.PHONY: clean purge debug default
+.PHONY: clean purge debug
 default: $(TEST)
 # .precious: $(TEST) default
 	
