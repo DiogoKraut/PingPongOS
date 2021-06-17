@@ -47,7 +47,7 @@ int main (int argc, char *argv[])
   task_create (&Pung, Body, "                    Pung") ;
   task_setprio (&Pung, 8);
 
-  task_yield () ;
+  task_join(&Pung) ;
 
   printf ("main: fim\n");
   exit (0) ;

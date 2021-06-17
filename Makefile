@@ -1,4 +1,4 @@
-CFLAGS = -Wall -Iheader
+CFLAGS = -Wall -Iheader -g
 LIBS = -lm
 CC = gcc
 

@@ -37,7 +37,11 @@ int main (int argc, char *argv[])
    task_create (&Pong, Body, "                Pong") ;
    task_create (&Pung, Body, "                    Pung") ;
 
-   task_yield () ;
+   task_join (&Pang) ;
+   task_join (&Peng) ;
+   task_join (&Ping) ;
+   task_join (&Pong) ;
+   task_join (&Pung) ;
 
    printf ("main: fim\n");
    exit (0);

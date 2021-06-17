@@ -12,7 +12,7 @@ int id;              // id tracker to guarantee unique task IDs
 int taskCount;
 task_t mainTask;  // main() task descriptor
 task_t *currentTask;
-task_t *rdyQ;
+task_t *rdyQ, *sleepQ;
 task_t dispatcherTask;
 
 // structures to assist with preemtion handling
@@ -23,6 +23,7 @@ void dispatcher();
 task_t *scheduler();
 void alarm_handler(int signum);
 unsigned int systime();
+void check_sleepers();
 
 void ppos_init() {
     /* desativa o buffer da saida padrao (stdout), usado pela função printf */
@@ -81,9 +82,7 @@ void ppos_init() {
 
 }
 
-unsigned int systime() {
-    return sys_ticks;
-}
+unsigned int systime() {return sys_ticks;}
 
 task_t *scheduler() {
     if(queue_size((queue_t *)rdyQ) == 0)
@@ -91,24 +90,122 @@ task_t *scheduler() {
 
     task_t *aux = rdyQ->next;
     task_t *highestPrio = rdyQ;
+    highestPrio->prio--;
+    /* find highest priority task and increase priority of other tasks in one pass */
+                    #ifdef DEBUG
+                    printf("RDY QUEUE: [%d", rdyQ->id);
+                    #endif
     while(aux != rdyQ) {
-        if(aux->prio < highestPrio->prio) // smaller prio value == higher priority
-            highestPrio = aux;
-
-        aux = aux->next;
-    }
-
-    aux = highestPrio->next;
-    while(aux != highestPrio) {
         aux->prio--;
+        if(aux->prio < highestPrio->prio)
+            highestPrio = aux;
         aux = aux->next;
+                    #ifdef DEBUG
+                    printf(" %d", aux->id);
+                    #endif
+    }
+                    #ifdef DEBUG
+                    printf("]\n");
+                    #endif
+    highestPrio->prio++;
+
+
+    // while(aux != rdyQ) {
+    //     if(aux->prio < highestPrio->prio) // smaller prio value == higher priority
+    //         highestPrio = aux;
+
+    //     aux = aux->next;
+    // }
+
+    // aux = highestPrio->next;
+    // while(aux != highestPrio) {
+    //     aux->prio--;
+    //     aux = aux->next;
+    // }
+
+    #ifdef DEBUG
+    printf("SCHED: Selected task %02d with prio %02d\n", highestPrio->id, highestPrio->prio);
+    #endif
+    highestPrio->prio = task_getprio(highestPrio);
+    return highestPrio;
+}
+
+void dispatcher() {
+    task_t *next;
+    while(taskCount > 0) {
+        check_sleepers();
+
+        next = scheduler();
+
+        if(next != NULL) {
+            // #ifdef DEBUG
+            // task_t *aux = rdyQ->next;
+            // printf("RDY QUEUE: [%d", rdyQ->id);
+
+            // while(aux != rdyQ) {
+            //     printf(" %d", aux->id);
+            //     aux = aux->next;
+            // }
+            // printf("]\n");
+            // #endif
+
+
+            queue_remove((queue_t **)&rdyQ, (queue_t *)next);
+            next->status = RUNNING;
+            next->quantum_size = QUANTUM_SIZE-1; // interval of size QUANTUM_SIZE is [0..QUANTUM_SIZE-1]
+
+            task_switch(next);
+            if(next->status == READY)
+                queue_append((queue_t**)&rdyQ, (queue_t *)next);
+            else if(next->status == STOPPED)
+                free(next->context.uc_stack.ss_sp);
+            // switch(next->status) {
+            //     case READY:
+            //         queue_append((queue_t**)&rdyQ, (queue_t *)next);
+            //         break;
+
+            //     case RUNNING:
+            //         /* Something went terribly wrong*/
+            //         break;
+
+            //     case STOPPED:
+            //         free(next->context.uc_stack.ss_sp);
+            //         break;
+
+            //     case SUSPENDED:
+            //         break;
+            //     case SLEEP:
+            //         /* add to idle Q */
+            //         break;
+            // }
+        } 
+
     }
 
-    highestPrio->prio = task_getprio(highestPrio);
-    // #ifdef DEBUG
-    // printf("SCHED: Selected task %02d with prio %02d\n", highestPrio->id, highestPrio->prio);
-    // #endif
-    return highestPrio;
+    task_exit(0);
+}
+
+void task_sleep(int t) {
+    queue_append((queue_t **)&sleepQ, (queue_t *)currentTask);
+    currentTask->wake_time = systime() + t;
+    currentTask->status = SLEEP;
+    task_switch(&dispatcherTask);
+}
+
+void check_sleepers() {
+    task_t *aux, *aux2;
+    int count = queue_size((queue_t *)sleepQ);
+    aux = sleepQ;
+    while(count > 0) {
+        aux2 = aux->next;
+        if(aux->wake_time <= systime() && aux->wake_time > 0) {
+            queue_remove((queue_t **)&sleepQ, (queue_t *)aux);
+            queue_append((queue_t **)&rdyQ,   (queue_t *)aux);
+        }
+        aux = aux2;
+        count--;
+    }
+
 }
 
 void alarm_handler(int signum) {
@@ -128,58 +225,6 @@ void alarm_handler(int signum) {
     }
 }
 
-void dispatcher() {
-    task_t *next;
-    while(taskCount > 0) {
-        next = scheduler();
-
-        if(next != NULL) {
-            #ifdef DEBUG
-            task_t *aux = rdyQ->next;
-            printf("RDY QUEUE: [%d", rdyQ->id);
-
-            while(aux != rdyQ) {
-                printf(" %d", aux->id);
-                aux = aux->next;
-            }
-            printf("]\n");
-            #endif
-
-
-            queue_remove((queue_t **)&rdyQ, (queue_t *)next);
-            next->status = RUNNING;
-            next->quantum_size = QUANTUM_SIZE-1; // interval of size QUANTUM_SIZE is [0..QUANTUM_SIZE-1]
-
-            task_switch(next);
-
-            switch(next->status) {
-                case READY:
-                    queue_append((queue_t**)&rdyQ, (queue_t *)next);
-                    break;
-
-                case RUNNING:
-                    /* Something went terribly wrong*/
-                    break;
-
-                case STOPPED:
-                    free(next->context.uc_stack.ss_sp);
-                    break;
-
-                case SUSPENDED:
-                    break;
-                case IDLE:
-                    /* add to idle Q */
-                    break;
-            }
-        } 
-
-    }
-
-    #ifdef DEBUG
-    printf("DISPATCHER: switching to task %02d\n", next->id);
-    #endif
-    task_exit(0);
-}
 
 void task_setprio(task_t *task, int prio) {
     if(prio > 20)
@@ -235,6 +280,7 @@ int task_create(task_t *task, void (*start_routine)(void *),  void *arg) {
         task->init_time = systime();
         task->tick_count = 0;
         task->activation_count = 0;
+        task->wake_time = 0;
 
         makecontext(&task->context, (void *)start_routine, 1, arg);
 

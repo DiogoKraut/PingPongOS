@@ -22,7 +22,7 @@ typedef enum {
 	RUNNING, // currently running
 	STOPPED, // reached end of execution
 	SUSPENDED,   // waiting for to join
-	IDLE     // interruptable sleep
+	SLEEP     //  sleep
 } Status;
 
 // Estrutura que define um Task Control Block (TCB)
@@ -32,15 +32,17 @@ typedef struct task_t
 	int id ;						// task id
 	ucontext_t context ;			// task context
 	Status status;					// current status
-	char static_prio;				// static priority
-	char prio;						// current priority
-	char is_system_task;			// system task indicator
+	short static_prio;				// static priority
+	short prio;						// current priority
+	short is_system_task;			// system task indicator
 	unsigned int quantum_size;		// tasks quantum
 	unsigned int init_time;			// time of creation
 	unsigned int tick_count;		// time spent in the CPU
 	unsigned int activation_count;	// times activated
 	struct task_t *waitQ;			// queue of tasks waiting to join
 	int exitCode;
+	unsigned int wake_time;			// time to sleep + systime when sleep is called
+
 	// ... (outros campos serão adicionados mais tarde)
 } task_t ;
 
