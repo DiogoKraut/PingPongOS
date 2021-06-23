@@ -23,7 +23,7 @@ void dispatcher();
 task_t *scheduler();
 void alarm_handler(int signum);
 unsigned int systime();
-void check_sleepers();
+void check_sleepers(int count);
 
 void ppos_init() {
     /* desativa o buffer da saida padrao (stdout), usado pela função printf */
@@ -92,7 +92,7 @@ task_t *scheduler() {
     task_t *highestPrio = rdyQ;
     highestPrio->prio--;
     /* find highest priority task and increase priority of other tasks in one pass */
-                    #ifdef DEBUG
+                    #ifdef DEBUG2
                     printf("RDY QUEUE: [%d", rdyQ->id);
                     #endif
     while(aux != rdyQ) {
@@ -100,11 +100,11 @@ task_t *scheduler() {
         if(aux->prio < highestPrio->prio)
             highestPrio = aux;
         aux = aux->next;
-                    #ifdef DEBUG
+                    #ifdef DEBUG2
                     printf(" %d", aux->id);
                     #endif
     }
-                    #ifdef DEBUG
+                    #ifdef DEBUG2
                     printf("]\n");
                     #endif
     highestPrio->prio++;
@@ -123,7 +123,7 @@ task_t *scheduler() {
     //     aux = aux->next;
     // }
 
-    #ifdef DEBUG
+    #ifdef DEBUG2
     printf("SCHED: Selected task %02d with prio %02d\n", highestPrio->id, highestPrio->prio);
     #endif
     highestPrio->prio = task_getprio(highestPrio);
@@ -133,51 +133,38 @@ task_t *scheduler() {
 void dispatcher() {
     task_t *next;
     while(taskCount > 0) {
-        check_sleepers();
+        int count = queue_size((queue_t *)sleepQ);
+        if(count > 0)
+            check_sleepers(count);
 
         next = scheduler();
 
         if(next != NULL) {
-            // #ifdef DEBUG
-            // task_t *aux = rdyQ->next;
-            // printf("RDY QUEUE: [%d", rdyQ->id);
-
-            // while(aux != rdyQ) {
-            //     printf(" %d", aux->id);
-            //     aux = aux->next;
-            // }
-            // printf("]\n");
-            // #endif
-
-
             queue_remove((queue_t **)&rdyQ, (queue_t *)next);
             next->status = RUNNING;
             next->quantum_size = QUANTUM_SIZE-1; // interval of size QUANTUM_SIZE is [0..QUANTUM_SIZE-1]
 
             task_switch(next);
-            if(next->status == READY)
-                queue_append((queue_t**)&rdyQ, (queue_t *)next);
-            else if(next->status == STOPPED)
-                free(next->context.uc_stack.ss_sp);
-            // switch(next->status) {
-            //     case READY:
-            //         queue_append((queue_t**)&rdyQ, (queue_t *)next);
-            //         break;
+          
+            switch(next->status) {
+                case READY:
+                    queue_append((queue_t**)&rdyQ, (queue_t *)next);
+                    break;
 
-            //     case RUNNING:
-            //         /* Something went terribly wrong*/
-            //         break;
+                case RUNNING:
+                    /* Something went terribly wrong*/
+                    break;
 
-            //     case STOPPED:
-            //         free(next->context.uc_stack.ss_sp);
-            //         break;
+                case STOPPED:
+                    free(next->context.uc_stack.ss_sp);
+                    break;
 
-            //     case SUSPENDED:
-            //         break;
-            //     case SLEEP:
-            //         /* add to idle Q */
-            //         break;
-            // }
+                case SUSPENDED:
+                    break;
+                case SLEEP:
+                    queue_append((queue_t **)&sleepQ, (queue_t *)next);
+                    break;
+            }
         } 
 
     }
@@ -186,16 +173,17 @@ void dispatcher() {
 }
 
 void task_sleep(int t) {
-    queue_append((queue_t **)&sleepQ, (queue_t *)currentTask);
     currentTask->wake_time = systime() + t;
     currentTask->status = SLEEP;
     task_switch(&dispatcherTask);
 }
 
-void check_sleepers() {
+void check_sleepers(int count) {
     task_t *aux, *aux2;
-    int count = queue_size((queue_t *)sleepQ);
     aux = sleepQ;
+    // #ifdef DEBUG
+    // printf("Checking sleepers\n");
+    // #endif
     while(count > 0) {
         aux2 = aux->next;
         if(aux->wake_time <= systime() && aux->wake_time > 0) {
@@ -205,7 +193,6 @@ void check_sleepers() {
         aux = aux2;
         count--;
     }
-
 }
 
 void alarm_handler(int signum) {
@@ -216,9 +203,6 @@ void alarm_handler(int signum) {
         return;
 
     if(currentTask->quantum_size == 0) {
-        // #ifdef DEBUG
-        // printf("ALARM: task %02d yielded\n", currentTask->id);
-        // #endif
         task_yield();
     } else {
         currentTask->quantum_size--;
