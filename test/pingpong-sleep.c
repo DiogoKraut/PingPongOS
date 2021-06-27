@@ -14,6 +14,10 @@ task_t Pang, Peng, Ping, Pong, Pung ;
 // corpo das threads
 void Body (void * arg)
 {
+
+
+
+
    int i, timeSleep, timeBefore, timeAfter ;
    char *status ;
 

@@ -16,7 +16,7 @@ default: $(TEST)
 debug: CFLAGS += -DDEBUG -g
 debug: $(TEST)
 
-%.o: %.c $(HEADERS)
+%.o: %.c $(HEADERS) 
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(TEST): $(OBJECTS)
