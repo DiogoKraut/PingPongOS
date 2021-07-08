@@ -17,11 +17,12 @@
 #define TRUE 1
 #define FALSE 0
 
+
 typedef enum {
 	READY,   // rdy to run
 	RUNNING, // currently running
 	STOPPED, // reached end of execution
-	SUSPENDED,   // waiting for to join
+	SUSPENDED,   // waiting to join
 	SLEEP     //  sleep
 } Status;
 
@@ -46,10 +47,16 @@ typedef struct task_t
 	// ... (outros campos serão adicionados mais tarde)
 } task_t ;
 
+extern task_t *currentTask, *rdyQ, dispatcherTask;
+
 // estrutura que define um semáforo
 typedef struct
 {
-  // preencher quando necessário
+  int val;
+  int lock;
+  short destroyed;
+  task_t *waitQ;
+
 } semaphore_t ;
 
 // estrutura que define um mutex

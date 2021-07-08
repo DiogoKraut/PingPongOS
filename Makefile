@@ -16,10 +16,13 @@ default: $(TEST)
 debug: CFLAGS += -DDEBUG -g
 debug: $(TEST)
 
+test/%.o: test/%.c $(HEADERS)
+	$(CC) $(CFLAGS) -c $< -o $@
+
 %.o: %.c $(HEADERS) 
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(TEST): $(OBJECTS)
+$(TEST): $(OBJECTS) $(TESTOBJS)
 	$(CC) $(CFLAGS) test/$@.c $(OBJECTS) -o $@
 
 clean:

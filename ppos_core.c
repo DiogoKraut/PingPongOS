@@ -152,7 +152,7 @@ void dispatcher() {
                     break;
 
                 case RUNNING:
-                    /* Something went terribly wrong*/
+                    /* Task was already inserted into rdyQ in another funtion */
                     break;
 
                 case STOPPED:
@@ -188,6 +188,7 @@ void check_sleepers(int count) {
         aux2 = aux->next;
         if(aux->wake_time <= systime() && aux->wake_time > 0) {
             queue_remove((queue_t **)&sleepQ, (queue_t *)aux);
+            aux->status = RUNNING;
             queue_append((queue_t **)&rdyQ,   (queue_t *)aux);
         }
         aux = aux2;
