@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <signal.h>
 #include <sys/time.h>
+#include <string.h>
 #include "ppos.h"
 #include "ppos_data.h"
 
@@ -83,4 +84,64 @@ int sem_destroy(semaphore_t *s) {
         count--;
     }
     return 0;
+}
+
+int mqueue_create(mqueue_t *queue, int max_msgs, int msg_size) {
+	queue->start = 0;
+	queue->end = 0;
+
+	queue->destroyed = 0;
+	queue->data = malloc(sizeof(msg_size) * max_msgs);
+	queue->max_size = max_msgs;
+	queue->elem_size = msg_size;
+
+	sem_create(&queue->sem_send, max_msgs);
+	sem_create(&queue->sem_recv, 0);
+	sem_create(&queue->sem_buffer, 1);
+
+	return 0;
+}
+
+int mqueue_send(mqueue_t *queue, void *msg) {
+	if(!queue || queue->destroyed) return -1;
+
+	sem_down(&queue->sem_send);
+	sem_down(&queue->sem_buffer);
+
+	memcpy(queue->data + (queue->end * queue->elem_size), msg, queue->elem_size);
+	queue->end = (queue->end + 1) % queue->max_size; 
+
+	sem_up(&queue->sem_buffer);
+	sem_up(&queue->sem_recv);
+
+	return 0;
+}
+
+int mqueue_recv(mqueue_t *queue, void *msg) {
+	if(!queue || queue->destroyed) return -1;
+
+	sem_down(&queue->sem_recv);
+	sem_down(&queue->sem_buffer);
+
+	memcpy(msg, queue->data + (queue->start * queue->elem_size), queue->elem_size);
+	queue->start = (queue->start + 1) % queue->max_size;
+
+	sem_up(&queue->sem_buffer);
+	sem_up(&queue->sem_send);
+
+	return 0;
+}
+
+int mqueue_destroy(mqueue_t *queue) {
+	if(!queue || queue->destroyed) return -1;
+
+	queue->destroyed = 1;
+
+	sem_destroy(&queue->sem_buffer);
+	sem_destroy(&queue->sem_send);
+	sem_destroy(&queue->sem_recv);
+
+	free(queue->data);
+
+	return 0;
 }

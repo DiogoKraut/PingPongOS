@@ -56,7 +56,6 @@ typedef struct
   int lock;
   short destroyed;
   task_t *waitQ;
-
 } semaphore_t ;
 
 // estrutura que define um mutex
@@ -74,7 +73,12 @@ typedef struct
 // estrutura que define uma fila de mensagens
 typedef struct
 {
-  // preencher quando necessário
+	semaphore_t sem_send, sem_recv, sem_buffer; // semaphore set
+  int start, end;	// indexes
+  char *data;			// byte sized data for easier traversal
+  int max_size;		// max_size * elem_size is the max number of bytes in data
+  size_t elem_size;
+  short destroyed;
 } mqueue_t ;
 
 #endif

@@ -109,20 +109,6 @@ task_t *scheduler() {
                     #endif
     highestPrio->prio++;
 
-
-    // while(aux != rdyQ) {
-    //     if(aux->prio < highestPrio->prio) // smaller prio value == higher priority
-    //         highestPrio = aux;
-
-    //     aux = aux->next;
-    // }
-
-    // aux = highestPrio->next;
-    // while(aux != highestPrio) {
-    //     aux->prio--;
-    //     aux = aux->next;
-    // }
-
     #ifdef DEBUG2
     printf("SCHED: Selected task %02d with prio %02d\n", highestPrio->id, highestPrio->prio);
     #endif
@@ -156,7 +142,7 @@ void dispatcher() {
                     break;
 
                 case STOPPED:
-                    free(next->context.uc_stack.ss_sp);
+                    //free(next->context.uc_stack.ss_sp);
                     break;
 
                 case SUSPENDED:

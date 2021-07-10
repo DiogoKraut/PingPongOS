@@ -1,29 +1,27 @@
-CFLAGS = -Wall -Iheader -g
+CFLAGS = -Wall -Iheader
 LIBS = -lm
 CC = gcc
+TESTDIR = test/
 
-TESTOBJS = $(patsubst %.c, %.o, $(wildcard test/*.c))
-OBJECTS = $(patsubst %.c, %.o, $(wildcard *.c))
+TARGET = pingpong-mqueue
 HEADERS = $(wildcard header/*.h)
-
+OBJECTS = $(patsubst %.c, %.o, $(wildcard *.c))
 TEST = $(notdir $(patsubst %.c, %, $(wildcard test/*.c)))
-PPOS = $(wildcard *.c)
 
-.PHONY: clean purge debug
-default: $(TEST)
-# .precious: $(TEST) default
-	
+.PHONY: all default
+default: $(TARGET)
+all: $(TEST)
 debug: CFLAGS += -DDEBUG -g
-debug: $(TEST)
+debug: $(TARGET)
 
-test/%.o: test/%.c $(HEADERS)
+$(TESTDIR)%.o: $(TESTDIR)%.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-%.o: %.c $(HEADERS) 
+%.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(TEST): $(OBJECTS) $(TESTOBJS)
-	$(CC) $(CFLAGS) test/$@.c $(OBJECTS) -o $@
+$(TEST): %:$(OBJECTS) $(TESTDIR)%.o $(HEADERS)
+	$(CC) $(CFLAGS) $^ $(LIBS) -o $@
 
 clean:
 	-rm -f *.o core
