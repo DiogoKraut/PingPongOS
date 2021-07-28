@@ -1,5 +1,5 @@
 CFLAGS = -Wall -Iheader
-LIBS = -lm
+LIBS = -lm -lrt
 CC = gcc
 TESTDIR = test/
 
