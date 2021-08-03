@@ -1,9 +1,9 @@
-CFLAGS = -Wall -Iheader
+CFLAGS = -Wall -Iheader -g
 LIBS = -lm -lrt
 CC = gcc
 TESTDIR = test/
 
-TARGET = pingpong-mqueue
+TARGET = pingpong-disco2
 HEADERS = $(wildcard header/*.h)
 OBJECTS = $(patsubst %.c, %.o, $(wildcard *.c))
 TEST = $(notdir $(patsubst %.c, %, $(wildcard test/*.c)))
@@ -11,7 +11,7 @@ TEST = $(notdir $(patsubst %.c, %, $(wildcard test/*.c)))
 .PHONY: all default
 default: $(TARGET)
 all: $(TEST)
-debug: CFLAGS += -DDEBUG -g
+debug: CFLAGS += -DDEBUG -DDEBUG2
 debug: $(TARGET)
 
 $(TESTDIR)%.o: $(TESTDIR)%.c

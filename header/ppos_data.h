@@ -47,7 +47,8 @@ typedef struct task_t
 	// ... (outros campos serão adicionados mais tarde)
 } task_t ;
 
-extern task_t *currentTask, *rdyQ, dispatcherTask;
+extern task_t *currentTask, *rdyQ, *sleepQ, *suspendedQ, dispatcherTask;
+extern int taskCount;
 
 // estrutura que define um semáforo
 typedef struct

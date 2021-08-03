@@ -12,7 +12,7 @@ int id;              // id tracker to guarantee unique task IDs
 int taskCount;
 task_t mainTask;  // main() task descriptor
 task_t *currentTask;
-task_t *rdyQ, *sleepQ;
+task_t *rdyQ, *sleepQ, *suspendedQ;
 task_t dispatcherTask;
 
 // structures to assist with preemtion handling
@@ -92,21 +92,21 @@ task_t *scheduler() {
     task_t *highestPrio = rdyQ;
     highestPrio->prio--;
     /* find highest priority task and increase priority of other tasks in one pass */
-                    #ifdef DEBUG2
-                    printf("RDY QUEUE: [%d", rdyQ->id);
-                    #endif
+                                #ifdef DEBUG2
+                                printf("RDY QUEUE: [%d", rdyQ->id);
+                                #endif
     while(aux != rdyQ) {
         aux->prio--;
         if(aux->prio < highestPrio->prio)
             highestPrio = aux;
         aux = aux->next;
-                    #ifdef DEBUG2
-                    printf(" %d", aux->id);
-                    #endif
+                                #ifdef DEBUG2
+                                printf(" %d", aux->id);
+                                #endif
     }
-                    #ifdef DEBUG2
-                    printf("]\n");
-                    #endif
+                                #ifdef DEBUG2
+                                printf("]\n");
+                                #endif
     highestPrio->prio++;
 
     #ifdef DEBUG2
@@ -146,6 +146,7 @@ void dispatcher() {
                     break;
 
                 case SUSPENDED:
+                    
                     break;
                 case SLEEP:
                     queue_append((queue_t **)&sleepQ, (queue_t *)next);
@@ -190,6 +191,9 @@ void alarm_handler(int signum) {
         return;
 
     if(currentTask->quantum_size == 0) {
+        #ifdef DEBUG
+        printf("Task %d preemted\n", currentTask->id);
+        #endif
         task_yield();
     } else {
         currentTask->quantum_size--;
